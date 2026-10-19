@@ -4,7 +4,38 @@ export type Satellite = {
   international_designator?: string | null
   object_type?: string | null
   country?: string | null
-  orbital_elements?: Record<string, unknown> | null
+  orbital_elements?: {
+    epoch: string
+    inclination_deg: number
+    raan_deg: number
+    eccentricity: number
+    argument_of_perigee_deg: number
+    mean_anomaly_deg: number
+    mean_motion_revolutions_per_day: number
+  } | null
+}
+
+export type LiveSatellite = {
+  norad_id: number
+  name: string
+  latitude: number
+  longitude: number
+  altitude_km: number
+  speed_km_per_s: number
+  country: string
+  object_type: string
+}
+
+export type TelemetryPacket = {
+  satellite_id: number
+  name: string
+  timestamp: string
+  frequency_mhz: number
+  snr_db: number
+  battery_volts: number
+  solar_watts: number
+  doppler_khz: number
+  lock_status: string
 }
 
 export type CatalogResponse = {
@@ -12,6 +43,8 @@ export type CatalogResponse = {
   satellites: Satellite[]
   source: string
   message: string
+  fetched_at?: string | null
+  stale?: boolean | null
 }
 
 export type PropagatedState = {
@@ -62,7 +95,20 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
 }
 
 export const api = {
-  catalog: () => request<CatalogResponse>('/api/catalog'),
+  catalog: async (): Promise<CatalogResponse> => {
+    let result = await request<CatalogResponse>('/api/catalog')
+    if (!result.satellites || result.satellites.length === 0) {
+      try {
+        result = await request<CatalogResponse>('/api/catalog/refresh', { method: 'POST' })
+      } catch (err) {
+        console.warn('Could not auto-refresh catalog:', err)
+      }
+    }
+    return result
+  },
+  refreshCatalog: () => request<CatalogResponse>('/api/catalog/refresh', { method: 'POST' }),
+  liveSatellites: () => request<LiveSatellite[]>('/api/satellites/live'),
+  telemetryFeed: () => request<TelemetryPacket[]>('/api/telemetry/feed'),
   submitAnalysis: (payload: AnalysisRequest) => request<AnalysisResponse>('/api/analysis', {
     method: 'POST',
     body: JSON.stringify(payload),
