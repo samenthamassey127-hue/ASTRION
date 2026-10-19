@@ -1,56 +1,51 @@
-import { StrictMode, useState } from 'react'
+import { StrictMode, useEffect, useMemo, useState } from 'react'
 import { createRoot } from 'react-dom/client'
+import { api, type AnalysisResponse, type Satellite } from './api'
 import './styles.css'
 
-const navItems = [
-  { icon: '◈', label: 'Mission control', active: true },
-  { icon: '◎', label: 'Observations', badge: '03' },
-  { icon: '⌁', label: 'Data streams' },
-  { icon: '◌', label: 'Models' },
-]
-
-const telemetry = [
-  { label: 'Objects tracked', value: '—', note: 'Awaiting data', icon: '◉' },
-  { label: 'Signal coverage', value: '—', note: 'No sources connected', icon: '◒' },
-  { label: 'Last sync', value: '—', note: 'Not available', icon: '↻' },
-]
+const navItems = [{ icon: '◈', label: 'Mission control', active: true }, { icon: '◎', label: 'Observations', badge: '03' }, { icon: '⌁', label: 'Data streams' }, { icon: '◌', label: 'Models' }]
 
 function App() {
   const [activeNav, setActiveNav] = useState('Mission control')
   const [view, setView] = useState('3D view')
+  const [catalog, setCatalog] = useState<Satellite[]>([])
+  const [catalogMessage, setCatalogMessage] = useState('Loading catalogue…')
+  const [catalogError, setCatalogError] = useState('')
+  const [primary, setPrimary] = useState('')
+  const [secondary, setSecondary] = useState('')
+  const [start, setStart] = useState('')
+  const [end, setEnd] = useState('')
+  const [step, setStep] = useState('60')
+  const [analysis, setAnalysis] = useState<AnalysisResponse | null>(null)
+  const [analysisState, setAnalysisState] = useState<'idle' | 'loading' | 'error'>('idle')
+  const [analysisError, setAnalysisError] = useState('')
 
-  return (
-    <div className="app-shell">
-      <aside className="sidebar">
-        <div className="brand"><span className="brand-mark">✦</span><span>ASTRION</span><span className="brand-beta">M1</span></div>
-        <div className="workspace-switcher"><span className="workspace-dot" /> <span><small>WORKSPACE</small>Northstar Lab</span><span className="chevron">⌄</span></div>
-        <div className="nav-label">Workspace</div>
-        <nav aria-label="Main navigation">
-          {navItems.map((item) => <button className={`nav-item ${activeNav === item.label ? 'active' : ''}`} key={item.label} onClick={() => setActiveNav(item.label)}><span className="nav-icon">{item.icon}</span>{item.label}{item.badge && <span className="nav-badge">{item.badge}</span>}</button>)}
-        </nav>
-        <div className="nav-label lower-label">System</div>
-        <nav>
-          <button className="nav-item"><span className="nav-icon">⚙</span>Settings</button>
-          <button className="nav-item"><span className="nav-icon">?</span>Help center</button>
-        </nav>
-        <div className="sidebar-footer"><div className="avatar">AM</div><div><strong>Alex Morgan</strong><small>Researcher</small></div><span className="more">•••</span></div>
-      </aside>
+  useEffect(() => { api.catalog().then((result) => { setCatalog(result.satellites); setCatalogMessage(result.message) }).catch((error: Error) => { setCatalogError(error.message); setCatalogMessage('Catalogue unavailable') }) }, [])
 
-      <main className="main-content">
-        <header className="topbar"><div className="breadcrumbs"><span>Mission control</span><span className="slash">/</span><strong>{activeNav}</strong></div><div className="top-actions"><span className="system-status"><i /> All systems nominal</span><button className="icon-button" aria-label="Notifications">♧<span className="notification-dot" /></button><button className="icon-button" aria-label="Command menu">⌘</button></div></header>
-        <div className="content-wrap">
-          <section className="page-heading"><div><p className="eyebrow">MONDAY, 14 OCTOBER 2024 <span className="eyebrow-line" /></p><h1>Good morning, Alex <span className="wave">✦</span></h1><p className="subtitle">Your orbital intelligence workspace is ready.</p></div><button className="primary-button"><span>＋</span> New observation</button></section>
+  const selected = useMemo(() => ({ primary: catalog.find((satellite) => String(satellite.norad_id) === primary), secondary: catalog.find((satellite) => String(satellite.norad_id) === secondary) }), [catalog, primary, secondary])
+  const submit = async () => {
+    if (!primary || !secondary || !start || !end) return
+    setAnalysisState('loading'); setAnalysisError(''); setAnalysis(null)
+    try { setAnalysis(await api.submitAnalysis({ primary_satellite_id: Number(primary), secondary_satellite_id: Number(secondary), start_time: new Date(start).toISOString(), end_time: new Date(end).toISOString(), step_seconds: Number(step) })) }
+    catch (error) { setAnalysisState('error'); setAnalysisError(error instanceof Error ? error.message : 'Analysis unavailable') }
+    finally { setAnalysisState((state) => state === 'error' ? state : 'idle') }
+  }
+  const states = analysis?.states ?? []
+  const points = states.map((state, index) => `${(index / Math.max(states.length - 1, 1)) * 100},${100 - Math.min(Math.abs(state.position_km[0]) / 10000, 1) * 80}`).join(' ')
 
-          <section className="telemetry-grid">{telemetry.map((item) => <article className="telemetry-card" key={item.label}><div className="card-top"><span>{item.label}</span><span className="telemetry-icon">{item.icon}</span></div><div className="telemetry-value">{item.value}</div><div className="telemetry-note"><span className="empty-dot" />{item.note}</div></article>)}</section>
-
-          <section className="visualization-panel panel"><div className="panel-header"><div><div className="panel-title-row"><h2>Orbital scene</h2><span className="live-pill">STANDBY</span></div><p>Interactive spatial overview</p></div><div className="view-toggle">{['3D view', 'Map'].map((option) => <button className={view === option ? 'selected' : ''} onClick={() => setView(option)} key={option}>{option}</button>)}</div></div><div className="scene"><div className="scene-grid" /><div className="orbit orbit-one" /><div className="orbit orbit-two" /><div className="scene-core">✦</div><div className="scene-empty"><div className="empty-illustration">◎</div><h3>Nothing in orbit yet</h3><p>Connect a data source or create an observation<br />to populate your orbital scene.</p><button className="secondary-button">Connect a data source <span>→</span></button></div><div className="scene-footer"><span><i className="legend-dot blue" /> Live telemetry</span><span><i className="legend-dot purple" /> Predicted path</span><span className="scene-coordinates">LAT — &nbsp; LONG — &nbsp; ALT —</span></div></div></section>
-
-          <section className="bottom-grid"><article className="panel analysis-card"><div className="panel-header compact"><div><h2>Analysis queue</h2><p>Review and prioritize your next signal</p></div><button className="text-button">View all <span>→</span></button></div><div className="queue-empty"><span className="queue-icon">⌁</span><div><strong>Your queue is clear</strong><p>New observations will appear here for analysis.</p></div></div></article><article className="panel quick-card"><div className="panel-header compact"><div><h2>Quick analysis</h2><p>Start with a focused workflow</p></div></div><div className="analysis-controls"><button><span className="control-icon">✧</span><span><strong>Pattern scan</strong><small>Find anomalies in a signal</small></span><span className="arrow">→</span></button><button><span className="control-icon">◌</span><span><strong>Orbit estimate</strong><small>Model an object's trajectory</small></span><span className="arrow">→</span></button></div></article></section>
-        </div>
-        <footer className="app-footer"><span><span className="footer-mark">✦</span> ASTRION MILESTONE 1</span><span>STATIC WORKSPACE <b>·</b> ALL DATA LOCAL</span></footer>
-      </main>
-    </div>
-  )
+  return <div className="app-shell">
+    <aside className="sidebar"><div className="brand"><span className="brand-mark">✦</span><span>ASTRION</span><span className="brand-beta">M6</span></div><div className="workspace-switcher"><span className="workspace-dot" /><span><small>WORKSPACE</small>Northstar Lab</span><span className="chevron">⌄</span></div><div className="nav-label">Workspace</div><nav aria-label="Main navigation">{navItems.map((item) => <button className={`nav-item ${activeNav === item.label ? 'active' : ''}`} key={item.label} onClick={() => setActiveNav(item.label)}><span className="nav-icon">{item.icon}</span>{item.label}{item.badge && <span className="nav-badge">{item.badge}</span>}</button>)}</nav><div className="nav-label lower-label">System</div><nav><button className="nav-item"><span className="nav-icon">⚙</span>Settings</button><button className="nav-item"><span className="nav-icon">?</span>Help center</button></nav><div className="sidebar-footer"><div className="avatar">AM</div><div><strong>Alex Morgan</strong><small>Researcher</small></div><span className="more">•••</span></div></aside>
+    <main className="main-content"><header className="topbar"><div className="breadcrumbs"><span>Mission control</span><span className="slash">/</span><strong>{activeNav}</strong></div><div className="top-actions"><span className="system-status"><i /> API connected</span><button className="icon-button" aria-label="Notifications">♧</button><button className="icon-button" aria-label="Command menu">⌘</button></div></header>
+      <div className="content-wrap"><section className="page-heading"><div><p className="eyebrow">ORBITAL ANALYSIS <span className="eyebrow-line" /></p><h1>Good morning, Alex <span className="wave">✦</span></h1><p className="subtitle">Configure a propagation window using connected catalogue data.</p></div><button className="primary-button" onClick={() => document.getElementById('analysis')?.scrollIntoView({ behavior: 'smooth' })}><span>＋</span> New analysis</button></section>
+        <section className="telemetry-grid"><article className="telemetry-card"><div className="card-top"><span>Objects tracked</span><span className="telemetry-icon">◉</span></div><div className="telemetry-value">{catalog.length || '—'}</div><div className="telemetry-note"><span className="empty-dot" />{catalog.length ? 'Catalogue objects' : catalogMessage}</div></article><article className="telemetry-card"><div className="card-top"><span>Propagation samples</span><span className="telemetry-icon">◒</span></div><div className="telemetry-value">{states.length || '—'}</div><div className="telemetry-note"><span className="empty-dot" />{states.length ? 'Returned by API' : 'Awaiting analysis'}</div></article><article className="telemetry-card"><div className="card-top"><span>Analysis status</span><span className="telemetry-icon">↻</span></div><div className="telemetry-value">{analysis?.status?.toUpperCase() ?? '—'}</div><div className="telemetry-note"><span className="empty-dot" />{analysis ? 'API response' : 'No result available'}</div></article></section>
+        <section className="panel analysis-workbench" id="analysis"><div className="panel-header"><div><div className="panel-title-row"><h2>Propagation analysis</h2><span className="live-pill">MILESTONE 6</span></div><p>Select two catalogue objects and a prediction window.</p></div></div><div className="control-grid"><label>Primary satellite<select value={primary} onChange={(event) => setPrimary(event.target.value)}><option value="">Select satellite</option>{catalog.map((satellite) => <option value={satellite.norad_id} key={satellite.norad_id}>{satellite.name} · {satellite.norad_id}</option>)}</select></label><label>Secondary satellite<select value={secondary} onChange={(event) => setSecondary(event.target.value)}><option value="">Select satellite</option>{catalog.map((satellite) => <option value={satellite.norad_id} key={satellite.norad_id}>{satellite.name} · {satellite.norad_id}</option>)}</select></label><label>Window start<input type="datetime-local" value={start} onChange={(event) => setStart(event.target.value)} /></label><label>Window end<input type="datetime-local" value={end} onChange={(event) => setEnd(event.target.value)} /></label><label>Sampling interval<select value={step} onChange={(event) => setStep(event.target.value)}><option value="10">10 seconds</option><option value="60">1 minute</option><option value="300">5 minutes</option><option value="900">15 minutes</option></select></label><button className="primary-button run-button" disabled={analysisState === 'loading' || !primary || !secondary || !start || !end || primary === secondary} onClick={submit}>{analysisState === 'loading' ? 'Submitting…' : 'Run analysis →'}</button></div>{catalogError && <p className="error-state">{catalogError}. Check that the FastAPI service is running.</p>}{analysisError && <p className="error-state">{analysisError}. The backend may not expose this milestone yet.</p>}</section>
+        <section className="comparison-grid"><ComparisonCard title="Primary object" satellite={selected.primary} /><ComparisonCard title="Secondary object" satellite={selected.secondary} /></section>
+        <section className="panel visualization-panel"><div className="panel-header"><div><div className="panel-title-row"><h2>Separation & propagated state</h2><span className="live-pill">{states.length ? 'LIVE DATA' : 'NO DATA'}</span></div><p>Values are rendered only when returned by the API.</p></div><div className="view-toggle">{['3D view', 'Map'].map((option) => <button className={view === option ? 'selected' : ''} onClick={() => setView(option)} key={option}>{option}</button>)}</div></div><div className="chart-area">{states.length ? <svg viewBox="0 0 100 100" role="img" aria-label="Propagated position chart"><polyline points={points} fill="none" stroke="#9b86ff" strokeWidth="1.5" vectorEffect="non-scaling-stroke" /></svg> : <div className="scene-empty"><div className="empty-illustration">◎</div><h3>{analysisState === 'loading' ? 'Waiting for propagation…' : 'No propagated state data'}</h3><p>Run an analysis to display returned positions and separation samples.<br />Unavailable values remain blank by design.</p></div>}<div className="chart-axis">{states.length ? `${states.length} returned samples · ${view}` : 'Prediction plot unavailable'}</div></div></section>
+        <section className="insight-grid"><article className="panel metadata-panel"><div className="panel-header compact"><div><h2>Research metadata</h2><p>Provenance and analysis envelope</p></div></div><dl><dt>Analysis ID</dt><dd>{analysis?.analysis_id ?? '—'}</dd><dt>Window</dt><dd>{analysis?.analysis_window_start && analysis.analysis_window_end ? `${analysis.analysis_window_start} → ${analysis.analysis_window_end}` : '—'}</dd><dt>Minimum separation</dt><dd>{analysis?.minimum_separation_km != null ? `${analysis.minimum_separation_km} km` : '—'}</dd><dt>Source</dt><dd>{catalog.length ? 'FastAPI catalogue' : 'Not configured'}</dd></dl></article><article className="panel metadata-panel warning-panel"><div className="panel-header compact"><div><h2>Warnings & limitations</h2><p>Interpretation guardrails</p></div></div>{analysis?.warnings?.length ? <ul>{analysis.warnings.map((warning) => <li key={warning}>{warning}</li>)}</ul> : <p className="empty-copy">{analysis?.message ?? 'No API warnings returned. Scientific outputs are estimates and require validated ephemeris data.'}</p>}</article></section>
+      </div><footer className="app-footer"><span><span className="footer-mark">✦</span> ASTRION MILESTONES 5–6</span><span>FASTAPI INTEGRATION <b>·</b> EMPTY STATES EXPLICIT</span></footer></main>
+  </div>
 }
+
+function ComparisonCard({ title, satellite }: { title: string; satellite?: Satellite }) { return <article className="panel comparison-card"><div className="comparison-label">{title}</div>{satellite ? <><h3>{satellite.name}</h3><p>NORAD {satellite.norad_id}</p><dl><dt>Object type</dt><dd>{satellite.object_type ?? '—'}</dd><dt>Country</dt><dd>{satellite.country ?? '—'}</dd><dt>Designator</dt><dd>{satellite.international_designator ?? '—'}</dd></dl></> : <div className="empty-copy">Select a catalogue object to compare.</div>}</article> }
 
 createRoot(document.getElementById('root')!).render(<StrictMode><App /></StrictMode>)

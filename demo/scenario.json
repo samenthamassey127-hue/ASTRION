@@ -1,0 +1,38 @@
+{
+  "scenario": "offline-empty-catalog-baseline",
+  "description": "Reproducible ASTRION documentation demo input. This is a parameter template, not a computed conjunction result.",
+  "source": {
+    "provider": "CelesTrak",
+    "url": "https://celestrak.org/NORAD/elements/gp.php?GROUP=stations&FORMAT=tle",
+    "attribution_required": true,
+    "network_required_for_live_run": true
+  },
+  "objects": [
+    { "norad_id": 25544, "name": "ISS (ZARYA)" },
+    { "norad_id": 43013, "name": "OBJECT-43013" }
+  ],
+  "analysis_window": {
+    "start": "2024-10-14T00:00:00Z",
+    "end": "2024-10-14T06:00:00Z",
+    "coarse_step_seconds": 60,
+    "refinement_step_seconds": 1,
+    "refinement_tolerance_km": 0.1,
+    "threshold_km": 10
+  },
+  "conventions": {
+    "time_scale": "UTC",
+    "propagator": "SGP4",
+    "propagator_frame": "TEME",
+    "position_unit": "km",
+    "velocity_unit": "km/s",
+    "angle_unit": "degree",
+    "mean_motion_unit": "revolutions/day"
+  },
+  "expected_scaffold_behavior": {
+    "catalog_status": "placeholder",
+    "satellites": [],
+    "network_request_performed": false,
+    "analysis_result": "unavailable",
+    "reason": "The process starts with no catalog; refresh is required before propagation or close-approach analysis."
+  }
+}

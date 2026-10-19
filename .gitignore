@@ -19,6 +19,8 @@ env/
 venv/
 .venv/
 ENV/
+*.egg-info/
+*/*.egg-info/
 
 # Testing & Coverage
 .pytest_cache/
