@@ -18,7 +18,31 @@ function OrbitRing({ radius, tilt, color }: { radius: number; tilt: [number, num
     const angle = (index / 128) * Math.PI * 2
     return [radius * Math.cos(angle), radius * Math.sin(angle), 0] as [number, number, number]
   }), [radius])
-  return <Line points={points} color={color} lineWidth={1} transparent opacity={0.5} rotation={tilt} />
+  return (
+    <>
+      <Line points={points} color={color} lineWidth={1.7} transparent opacity={0.7} rotation={tilt} />
+      <Line points={points} color={color} lineWidth={5} transparent opacity={0.08} rotation={tilt} />
+    </>
+  )
+}
+
+function DeepSpaceBackdrop() {
+  return (
+    <>
+      <mesh scale={42}>
+        <sphereGeometry args={[1, 32, 32]} />
+        <meshBasicMaterial color="#070b20" side={THREE.BackSide} />
+      </mesh>
+      <mesh scale={38} rotation={[0.35, -0.6, 0.2]}>
+        <sphereGeometry args={[1, 32, 32]} />
+        <meshBasicMaterial color="#26184c" transparent opacity={0.18} side={THREE.BackSide} blending={THREE.AdditiveBlending} />
+      </mesh>
+      <mesh scale={34} rotation={[-0.2, 0.8, 0]}>
+        <sphereGeometry args={[1, 32, 32]} />
+        <meshBasicMaterial color="#0b416c" transparent opacity={0.12} side={THREE.BackSide} blending={THREE.AdditiveBlending} />
+      </mesh>
+    </>
+  )
 }
 
 function Earth({ onSelect }: { onSelect: (marker: Marker) => void }) {
@@ -78,6 +102,10 @@ function MarkerMesh({ marker, onSelect }: { marker: Marker; onSelect: (marker: M
       <mesh scale={hovered ? 1.6 : 1}>
         <sphereGeometry args={[0.08, 16, 16]} />
         <meshBasicMaterial color={marker.color} />
+      </mesh>
+      <mesh scale={hovered ? 4 : 3}>
+        <sphereGeometry args={[0.08, 16, 16]} />
+        <meshBasicMaterial color={marker.color} transparent opacity={0.12} blending={THREE.AdditiveBlending} />
       </mesh>
       <mesh scale={hovered ? 2.5 : 1.8}>
         <ringGeometry args={[0.09, 0.11, 24]} />
@@ -151,13 +179,18 @@ export function EarthScene({ analysis, view }: { analysis: AnalysisResponse | nu
 
   return (
     <div className="earth-scene" aria-label="Interactive ASTRION 3D orbital visualization">
-      <Canvas camera={{ position: [0, 1.2, 7.2], fov: 42 }} dpr={[1, 2]}>
+       <Canvas camera={{ position: [0, 0.75, 6.1], fov: 38 }} dpr={[1, 2]} gl={{ antialias: true }}>
         <color attach="background" args={['#070b17']} />
-        <ambientLight intensity={0.4} />
-        <directionalLight position={[4, 3, 5]} intensity={2.8} color="#b7d8ff" />
-        <Stars radius={55} depth={35} count={1200} factor={2} saturation={0.1} fade speed={0.25} />
+         <DeepSpaceBackdrop />
+         <ambientLight intensity={0.22} color="#526aa8" />
+         <directionalLight position={[5, 4, 6]} intensity={3.4} color="#c5e1ff" />
+         <pointLight position={[-5, -2, 4]} intensity={1.3} color="#467cff" />
+         <Stars radius={65} depth={45} count={2200} factor={2.4} saturation={0.15} fade speed={0.18} />
+         <Stars radius={35} depth={20} count={700} factor={4} saturation={0.35} fade speed={0.08} />
         <OrbitRing radius={2.75} tilt={[0.55, 0.2, 0]} color="#4ade80" />
-        <OrbitRing radius={3.55} tilt={[-0.3, 0.7, 0.4]} color="#fbbf24" />
+         <OrbitRing radius={3.55} tilt={[-0.3, 0.7, 0.4]} color="#fbbf24" />
+         <OrbitRing radius={3.05} tilt={[1.05, -0.3, 0.7]} color="#60a5fa" />
+         <OrbitRing radius={3.85} tilt={[0.15, 0.95, -0.2]} color="#a78bfa" />
         <Earth onSelect={setSelected} />
         <ApiMarkers states={states} onSelect={setSelected} />
         <OrbitControls
@@ -172,18 +205,22 @@ export function EarthScene({ analysis, view }: { analysis: AnalysisResponse | nu
       <CameraActions controls={controls} />
       <div className="scene-badge">
         <span className={states.length ? 'status-live' : 'status-demo'} />
-        {states.length ? 'API SGP4 EPHEMERIDES' : 'REAL-TIME 3D ORBIT TRACKER'}
-      </div>
+         {states.length ? 'API SGP4 EPHEMERIDES' : 'DEMO ORBITAL VIEW'}
+       </div>
+       <div className="scene-hud">
+         <span>ORBITAL VIEW · DEEP SPACE</span>
+         <span className="hud-coordinate">FRAME: TEME / EARTH-CENTERED</span>
+       </div>
       <div className="scene-legend">
         <span><i className="legend-earth" />EARTH</span>
         <span><i className="legend-orbit" />ORBIT PLANE</span>
-        <span><i className="legend-marker" />{states.length ? 'SGP4 SAMPLE' : 'TARGET'}</span>
+         <span><i className="legend-marker" />{states.length ? 'SGP4 SAMPLE' : 'DEMO TARGET'}</span>
       </div>
       {selected && (
         <div className="marker-inspector">
           <button onClick={() => setSelected(null)} aria-label="Close details">×</button>
           <strong>{selected.label}</strong>
-          <span>{selected.source === 'API' ? 'Propagated orbital coordinate' : 'Live tracked orbital object'}</span>
+           <span>{selected.source === 'API' ? 'Propagated orbital coordinate · API data' : 'DEMO geometry · not scientific data'}</span>
         </div>
       )}
       <div className="time-overlay">
@@ -201,7 +238,7 @@ export function EarthScene({ analysis, view }: { analysis: AnalysisResponse | nu
         />
         <small>{apiState?.timestamp ? new Date(apiState.timestamp).toUTCString() : 'Active SGP4 propagation window'}</small>
       </div>
-      <div className="scene-view-label">{view.toUpperCase()} · DRAG TO ROTATE · SCROLL TO ZOOM</div>
+       <div className="scene-view-label">{view.toUpperCase()} · DRAG TO ROTATE · SCROLL TO ZOOM · DEMO GEOMETRY NOT SCIENTIFIC DATA</div>
     </div>
   )
 }

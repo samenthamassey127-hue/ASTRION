@@ -281,7 +281,7 @@ function App() {
                       <h2>Interactive 3D Orbital Scene</h2>
                       <span className="live-pill">{states.length ? 'SGP4 ACTIVE' : 'LIVE 3D'}</span>
                     </div>
-                    <p>Rotate globe, inspect orbit inclinations, and scrub through propagated time steps.</p>
+                     <p>Rotate globe, inspect orbit inclinations, and scrub through propagated time steps. Demo geometry is not scientific data.</p>
                   </div>
                   <div className="view-toggle">
                     {['3D view', 'Map'].map((option) => (
