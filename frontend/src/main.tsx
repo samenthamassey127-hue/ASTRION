@@ -1,8 +1,32 @@
-import { StrictMode, useEffect, useMemo, useState } from 'react'
+import { Component, StrictMode, useEffect, useMemo, useState, type ReactNode } from 'react'
 import { createRoot } from 'react-dom/client'
 import { api, type AnalysisResponse, type Satellite } from './api'
 import { EarthScene } from './EarthScene'
 import './styles.css'
+
+class ErrorBoundary extends Component<{ children: ReactNode; fallback?: ReactNode }, { hasError: boolean; error?: Error }> {
+  state = { hasError: false, error: undefined }
+  static getDerivedStateFromError(error: Error) {
+    return { hasError: true, error }
+  }
+  componentDidCatch(error: Error, info: unknown) {
+    console.error('3D Visualizer Error:', error, info)
+  }
+  render() {
+    if (this.state.hasError) {
+      return this.props.fallback || (
+        <div style={{ height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: '#070b17', color: '#94a3b8', padding: '20px', textAlign: 'center' }}>
+          <div style={{ fontSize: '32px', marginBottom: '12px' }}>🛰️</div>
+          <strong style={{ color: '#e2e8f0', marginBottom: '6px' }}>Orbital Viewport Fallback</strong>
+          <p style={{ fontSize: '11px', maxWidth: '400px', margin: 0, color: '#64748b' }}>
+            WebGL scene acceleration unavailable. Analysis, ephemeris calculations, and telemetry below remain fully active.
+          </p>
+        </div>
+      )
+    }
+    return this.props.children
+  }
+}
 
 const navItems = [
   { icon: '◈', label: 'Mission control' },
@@ -268,7 +292,9 @@ function App() {
                   </div>
                 </div>
                 <div className="chart-area">
-                  <EarthScene analysis={analysis} view={view} />
+                  <ErrorBoundary>
+                    <EarthScene analysis={analysis} view={view} />
+                  </ErrorBoundary>
                   <div className="chart-axis">
                     {states.length ? `${states.length} SGP4 state vectors · ${view} active` : 'Interactive 3D space scene'}
                   </div>
@@ -688,8 +714,13 @@ function ComparisonCard({ title, satellite }: { title: string; satellite?: Satel
   )
 }
 
-createRoot(document.getElementById('root')!).render(
-  <StrictMode>
-    <App />
-  </StrictMode>
-)
+const rootElement = document.getElementById('root')
+if (rootElement) {
+  const root = (window as unknown as { __reactRoot?: ReturnType<typeof createRoot> }).__reactRoot ?? createRoot(rootElement)
+  ;(window as unknown as { __reactRoot?: ReturnType<typeof createRoot> }).__reactRoot = root
+  root.render(
+    <StrictMode>
+      <App />
+    </StrictMode>
+  )
+}
